@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>郑希“同比二阶导数+全球联动”量化选股看板</title>
+    <title>郑希“同比二阶导数+中观景气+全球联动”量化选股看板</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,8 @@
             --success-glow: rgba(16, 185, 129, 0.15);
             --warning: #f59e0b;
             --danger: #ef4444;
-            --glass-bg: rgba(17, 24, 39, 0.7);
+            --danger-glow: rgba(239, 68, 68, 0.15);
+            --glass-bg: rgba(17, 24, 39, 0.85);
             --glass-blur: blur(12px);
         }
 
@@ -46,7 +47,7 @@
         }
 
         .container {
-            max-width: 1450px;
+            max-width: 1550px;
             margin: 0 auto;
         }
 
@@ -253,6 +254,9 @@
             font-size: 0.85rem;
             cursor: pointer;
             transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
         }
 
         .filter-tag:hover {
@@ -402,6 +406,246 @@
             border: 1px solid rgba(239, 68, 68, 0.35);
         }
 
+        /* Upgraded Global Linkage Signal Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.2rem 0.45rem;
+            border-radius: 5px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            width: fit-content;
+        }
+
+        .badge-buy {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-risk {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-sync {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--primary);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .badge-wait {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--warning);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .badge-none {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border-color: var(--card-border);
+        }
+
+        /* Prosperity Progress Bar Gauge */
+        .prosperity-gauge {
+            width: 100px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 0.3rem;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .prosperity-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--success) 100%);
+            border-radius: 999px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(3, 7, 18, 0.6);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .modal.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            background: var(--glass-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 2rem;
+            width: 92%;
+            max-width: 680px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            position: relative;
+            transform: scale(0.92);
+            transition: transform 0.25s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 1.2rem;
+            right: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-header {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 1rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .modal-header p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Flow diagram styles in modal */
+        .flow-container {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin: 1.5rem 0;
+        }
+
+        @media (max-width: 600px) {
+            .flow-container {
+                flex-direction: column;
+            }
+            .flow-arrow {
+                transform: rotate(90deg);
+                margin: 0.25rem auto;
+            }
+        }
+
+        .flow-step {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.25rem 1rem;
+            text-align: center;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .flow-step:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .flow-step h4 {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .flow-step .val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .flow-step .sub-val {
+            font-size: 0.75rem;
+            margin-top: 0.3rem;
+            font-weight: 600;
+            display: block;
+        }
+
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255, 255, 255, 0.15);
+        }
+
+        .flow-arrow i {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Details list in modal */
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 500px) {
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .detail-item {
+            background: rgba(17, 24, 39, 0.4);
+            border: 1px solid var(--card-border);
+            padding: 0.8rem 1rem;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detail-item span:first-child {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .detail-item span:last-child {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
         /* Empty State */
         .empty-state {
             padding: 4rem 2rem;
@@ -439,7 +683,7 @@
     <header>
         <div class="header-left">
             <h1>郑希策略“中观景气+全球联动”量化看板</h1>
-            <p><i data-lucide="info"></i> 自动过滤“同比二阶加速+中观景气指数+美股映射套利+杜邦健康+盈余保障+高成长+充足流动性”的标的</p>
+            <p><i data-lucide="info"></i> 自动过滤“同比二阶加速+中观景气得分+美股联动先导+杜邦健康+盈余保障+高成长+充足流动性”的标的</p>
         </div>
         <div class="update-badge" id="update-badge">
             <span class="pulse"></span>
@@ -452,16 +696,16 @@
         <!-- Strategy pillars -->
         <div class="strategy-intro">
             <div class="pillar-card">
-                <h3>1. 中观行业景气与全球映射</h3>
-                <p><strong>行业景气度</strong>：0.5*行业均营收增速 + 0.5*行业均净利增速。<strong>全球映射</strong>：测算核心TMT对标美股（AMAT、FN、ON、COHR）近20日相关系数及5日先行回报，发出补涨/防守信号。</p>
+                <h3>1. 中观行业景气与价格趋势</h3>
+                <p><strong>景气度指数</strong>：加权计算行业营收增速 (30%) + ROE增速 (30%) + 资产周转率变动 (20%) + 板块 20 日价格涨幅 (20%)，进行全市场归一化打分，刻画行业中观气温。</p>
             </div>
             <div class="pillar-card">
-                <h3>2. ROE同比二阶加速与杜邦质量</h3>
-                <p><strong>二阶加速</strong>：同比改善幅度滚动加速（二阶导数 &gt; 0）。<strong>防雷风控</strong>：权益乘数 &lt; 3.0，盈余现金保障倍数 &ge; 0.5，改善标准差 &lt; 2.0% 过滤波动股。</p>
+                <h3>2. 全球美股先导与联动套利</h3>
+                <p>测算 TMT 股与其美股标的在 20 个交易日的**收益率相关系数**与**滞后 correlation**。当美股主导并大幅波动时，快速预警**🟢补涨/🔴避险**信号。</p>
             </div>
             <div class="pillar-card">
-                <h3>3. 定价权验证与充足流动性</h3>
-                <p>单季毛利率同比上升印证定价权扩张。营收同比 &gt; 15% 或净利 &gt; 20% 确证成长，日交易额 &gt; 8000 万保驾极速避险能力。</p>
+                <h3>3. 产业链验证与防雷指标</h3>
+                <p>增量提取设备端**合同负债/预收款同比**，制造端**在建工程/固定资产同比**以验证订单饱满度。权益乘数 &lt; 3.0，盈余现金保障 &ge; 0.5，防范高杠杆和虚假账面利润。</p>
             </div>
         </div>
 
@@ -495,17 +739,18 @@
             <table id="stocks-table">
                 <thead>
                     <tr>
-                        <th onclick="sortTable('code')">股票代码/名称/全球联动 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('industry')">行业/中观景气/杜邦杠杆 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('code')">股票代码/名称/全球先导 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('industry')">行业/中观景气指数 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('turnover')">成交量能/现金流 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('turnover')">量能/防雷风控 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('latest_roe')">当前 ROE / 同比/稳定度 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('roe_acceleration')">同比二阶加速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('latest_margin')">毛利率 (YoY) <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('margin_change')">同比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('margin_change')">毛利率同比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('net_profit_growth')">归母净利增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('revenue_growth')">营业收入增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th>产业链验证</th>
                     </tr>
                 </thead>
                 <tbody id="stocks-tbody">
@@ -526,8 +771,73 @@
     </footer>
 </div>
 
+<!-- Modal for Value Chain Verification -->
+<div id="val-chain-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()"><i data-lucide="x" style="width: 24px; height: 24px;"></i></span>
+        <div class="modal-header">
+            <h2 id="modal-title">中际旭创 (300308) 产业链验证看板</h2>
+            <p id="modal-subtitle">中观行业景气度评分与个股高频订单/扩产情况确证</p>
+        </div>
+        
+        <!-- Block 1: Industry details -->
+        <h3 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--primary);">1. 行业中观景气分项指标</h3>
+        <div class="details-grid" id="modal-ind-details">
+            <!-- Dynamic -->
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--card-border); margin: 1.5rem 0;">
+
+        <!-- Block 2: Value Chain Flow -->
+        <h3 style="font-size: 1rem; margin-bottom: 0.5rem; color: var(--success);">2. 产业链微观数据确证 (设备/制造端)</h3>
+        <div class="flow-container">
+            <!-- Equipment -->
+            <div class="flow-step">
+                <h4>① 设备端合同负债</h4>
+                <div class="val" id="flow-contract">-</div>
+                <span class="sub-val" id="flow-contract-yoy">-</span>
+            </div>
+            
+            <div class="flow-arrow">
+                <i data-lucide="arrow-right"></i>
+            </div>
+            
+            <!-- Construction -->
+            <div class="flow-step">
+                <h4>② 制造端在建工程</h4>
+                <div class="val" id="flow-cip">-</div>
+                <span class="sub-val" id="flow-cip-yoy">-</span>
+            </div>
+            
+            <div class="flow-arrow">
+                <i data-lucide="arrow-right"></i>
+            </div>
+            
+            <!-- Fixed Asset -->
+            <div class="flow-step">
+                <h4>③ 制造端固定资产</h4>
+                <div class="val" id="flow-fixed">-</div>
+                <span class="sub-val" id="flow-fixed-yoy">-</span>
+            </div>
+        </div>
+
+        <!-- Block 3: Advancing/prepayment details -->
+        <div class="details-grid" style="margin-top: 1rem;">
+            <div class="detail-item">
+                <span>预收账款</span>
+                <span id="detail-advance">-</span>
+            </div>
+            <div class="detail-item">
+                <span>预收账款增速</span>
+                <span id="detail-advance-yoy">-</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let allStocks = [];
+    let stockLookup = {};
     let filteredStocks = [];
     let currentSortField = 'net_profit_growth';
     let currentSortOrder = 'desc'; // 'asc' or 'desc'
@@ -541,6 +851,12 @@
             
             allStocks = data.stocks || [];
             filteredStocks = [...allStocks];
+            
+            // Build fast lookup dictionary
+            stockLookup = {};
+            allStocks.forEach(stock => {
+                stockLookup[stock.code] = stock;
+            });
             
             // Render updates info
             document.getElementById('update-time-text').textContent = `最后更新：${data.update_time} (${data.latest_quarter} 同比分析数据)`;
@@ -612,23 +928,48 @@
             const accClass = stock.roe_acceleration > 0 ? 'acc-positive' : 'acc-negative';
             const accIcon = stock.roe_acceleration > 0 ? '▲' : '▼';
             
-            // Global Linkage Cell building
+            // Global Linkage Cell building with color badges
             let globalLinkHtml = '';
             if (stock.global_peer && stock.global_peer !== '无') {
-                const signalClass = stock.global_lead_return > 0 ? 'trend-up' : (stock.global_lead_return < 0 ? 'trend-down' : '');
-                const signalIcon = stock.global_lead_return > 0 ? '▲' : '▼';
-                const signVal = stock.global_lead_return > 0 ? '+' : '';
-                const corrVal = stock.global_correlation !== null ? `r=${stock.global_correlation.toFixed(2)}` : '暂无数据';
+                const signal = stock.global_lead_signal || '无明显先导关联';
+                let badgeClass = 'badge-none';
+                let signalIcon = '⚪';
+                
+                if (signal === '左侧补涨信号') {
+                    badgeClass = 'badge-buy';
+                    signalIcon = '🟢';
+                } else if (signal === '防守避险信号') {
+                    badgeClass = 'badge-risk';
+                    signalIcon = '🔴';
+                } else if (signal === '同步强联动') {
+                    badgeClass = 'badge-sync';
+                    signalIcon = '🔵';
+                } else if (signal.includes('先导联动')) {
+                    badgeClass = 'badge-wait';
+                    signalIcon = '🟡';
+                }
+                
+                const c_sync = stock.global_correlation !== null ? stock.global_correlation.toFixed(2) : '-';
+                const c_lag = stock.global_lead_correlation !== null ? stock.global_lead_correlation.toFixed(2) : '-';
+                const us_ret_sign = stock.global_lead_return > 0 ? '+' : '';
+                
                 globalLinkHtml = `
-                    <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: var(--warning); font-weight: 600;">
-                        <i data-lucide="globe" style="width: 13px; height: 13px;"></i>
-                        <span>${stock.global_peer.split(" ")[1]} (${corrVal})</span>
-                        <span class="${signalClass}" style="font-size: 0.7rem; font-weight: 700; margin-left: 0.2rem;">
-                            ${signalIcon} 5日 ${signVal}${stock.global_lead_return.toFixed(1)}%
+                    <div style="margin-top: 0.4rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span class="badge ${badgeClass}">${signalIcon} ${signal}</span>
+                        <span class="stock-code" style="font-size: 0.7rem; color: var(--text-secondary);">
+                            美股 ${stock.global_peer.split(" ").slice(-1)[0]} (同步:${c_sync} / 滞后:${c_lag})
+                        </span>
+                        <span class="stock-code ${stock.global_lead_return > 0 ? 'trend-up' : (stock.global_lead_return < 0 ? 'trend-down' : '')}" style="font-size: 0.7rem; font-weight: 600;">
+                            美股 5日涨幅: ${us_ret_sign}${stock.global_lead_return.toFixed(1)}%
                         </span>
                     </div>
                 `;
+            } else {
+                globalLinkHtml = `<span style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-top: 0.4rem;">无美股对标标的</span>`;
             }
+            
+            // Prosperity level mapping to visual gauge
+            const prosperity = stock.industry_prosperity || 50.0;
             
             tr.innerHTML = `
                 <td>
@@ -640,8 +981,13 @@
                 </td>
                 <td>
                     <span class="industry-tag">${stock.industry}</span>
-                    <span class="stock-code" style="display:block;margin-top:0.25rem;">中观景气: ${stock.industry_prosperity.toFixed(2)}%</span>
-                    <span class="stock-code" style="display:block;margin-top:0.15rem;">杠杆 ${stock.equity_multiplier.toFixed(2)}x (EM)</span>
+                    <div style="margin-top: 0.35rem; font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                        景气得分: ${prosperity.toFixed(1)}
+                    </div>
+                    <div class="prosperity-gauge">
+                        <div class="prosperity-bar" style="width: ${prosperity}%"></div>
+                    </div>
+                    <span class="stock-code" style="display:block;margin-top:0.25rem; font-size: 0.72rem;">杠杆 ${stock.equity_multiplier.toFixed(2)}x (EM)</span>
                 </td>
                 <td>
                     <div>${stock.price !== null ? stock.price.toFixed(2) : '-'}</div>
@@ -651,7 +997,7 @@
                 <td>
                     <div>${stock.turnover !== null ? stock.turnover.toFixed(1) : '-'} 百万</div>
                     <div class="stock-code">换手 ${stock.turnover_rate !== null ? stock.turnover_rate.toFixed(2) : '-'}%</div>
-                    <div class="stock-code" style="font-size:0.7rem;margin-top:0.15rem;color:var(--primary);font-weight:600;">盈余保障 ${stock.cash_coverage.toFixed(2)}x</div>
+                    <div class="stock-code" style="font-size:0.72rem;margin-top:0.2rem;color:var(--primary);font-weight:600;">盈余保障 ${stock.cash_coverage.toFixed(2)}x</div>
                 </td>
                 <td>
                     <div style="margin-bottom: 0.15rem;"><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></div>
@@ -674,12 +1020,105 @@
                 <td class="${stock.revenue_growth > 0 ? 'trend-up' : (stock.revenue_growth < 0 ? 'trend-down' : '')}">
                     ${stock.revenue_growth !== null ? (stock.revenue_growth > 0 ? '+' : '') + stock.revenue_growth.toFixed(2) + '%' : '-'}
                 </td>
+                <td>
+                    <button class="filter-tag active" onclick="showValueChain('${stock.code}')" style="background: var(--primary-glow); border-color: var(--primary); color: var(--primary); padding: 0.3rem 0.6rem; cursor: pointer; transition: all 0.2s;">
+                        <i data-lucide="git-branch" style="width: 12px; height: 12px;"></i>数据确证
+                    </button>
+                </td>
             `;
             tbody.appendChild(tr);
         });
         
         // Refresh lucide icons for newly added rows
         lucide.createIcons();
+    }
+
+    // Modal show and fill logic
+    function showValueChain(code) {
+        const stock = stockLookup[code];
+        if (!stock) return;
+        
+        // Fill Title
+        document.getElementById('modal-title').textContent = `${stock.name} (${stock.code}) 产业链验证`;
+        document.getElementById('modal-subtitle').textContent = `所处行业：${stock.industry} • 行业归一化中观景气度：${(stock.industry_prosperity || 50.0).toFixed(1)}分`;
+        
+        // Fill Industry prosperity Details
+        const indDetails = stock.industry_prosperity_details || {};
+        const indDetailsContainer = document.getElementById('modal-ind-details');
+        indDetailsContainer.innerHTML = `
+            <div class="detail-item">
+                <span>行业营收中位数增速</span>
+                <span class="trend-up">+${indDetails.rev_growth || 0.0}%</span>
+            </div>
+            <div class="detail-item">
+                <span>行业ROE同比增量中位数</span>
+                <span class="trend-up">+${indDetails.roe_growth || 0.0}%</span>
+            </div>
+            <div class="detail-item">
+                <span>资产周转率增速 (产能代理)</span>
+                <span class="${(indDetails.cap_growth || 0) >= 0 ? 'trend-up' : 'trend-down'}">${(indDetails.cap_growth || 0) >= 0 ? '+' : ''}${indDetails.cap_growth || 0.0}%</span>
+            </div>
+            <div class="detail-item">
+                <span>板块 20日 价格增速</span>
+                <span class="${(indDetails.price_growth || 0) >= 0 ? 'trend-up' : 'trend-down'}">${(indDetails.price_growth || 0) >= 0 ? '+' : ''}${indDetails.price_growth || 0.0}%</span>
+            </div>
+        `;
+        
+        // Fill Value chain flow
+        const vc = stock.value_chain || {
+            contract_liab: 0.0, contract_liab_yoy: 0.0,
+            advance_receivables: 0.0, advance_receivables_yoy: 0.0,
+            cip: 0.0, cip_yoy: 0.0,
+            fixed_asset: 0.0, fixed_asset_yoy: 0.0
+        };
+        
+        // Contract Liabilities
+        document.getElementById('flow-contract').textContent = `${vc.contract_liab.toFixed(2)} 亿`;
+        const cYoy = vc.contract_liab_yoy;
+        const cYoyClass = cYoy > 0 ? 'trend-up' : (cYoy < 0 ? 'trend-down' : '');
+        document.getElementById('flow-contract-yoy').textContent = `同比 ${cYoy > 0 ? '+' : ''}${cYoy.toFixed(1)}%`;
+        document.getElementById('flow-contract-yoy').className = `sub-val ${cYoyClass}`;
+        
+        // Construction in progress
+        document.getElementById('flow-cip').textContent = `${vc.cip.toFixed(2)} 亿`;
+        const cipYoy = vc.cip_yoy;
+        const cipYoyClass = cipYoy > 0 ? 'trend-up' : (cipYoy < 0 ? 'trend-down' : '');
+        document.getElementById('flow-cip-yoy').textContent = `同比 ${cipYoy > 0 ? '+' : ''}${cipYoy.toFixed(1)}%`;
+        document.getElementById('flow-cip-yoy').className = `sub-val ${cipYoyClass}`;
+        
+        // Fixed assets
+        document.getElementById('flow-fixed').textContent = `${vc.fixed_asset.toFixed(2)} 亿`;
+        const fYoy = vc.fixed_asset_yoy;
+        const fYoyClass = fYoy > 0 ? 'trend-up' : (fYoy < 0 ? 'trend-down' : '');
+        document.getElementById('flow-fixed-yoy').textContent = `同比 ${fYoy > 0 ? '+' : ''}${fYoy.toFixed(1)}%`;
+        document.getElementById('flow-fixed-yoy').className = `sub-val ${fYoyClass}`;
+        
+        // Advance
+        document.getElementById('detail-advance').textContent = `${vc.advance_receivables.toFixed(2)} 亿`;
+        const adYoy = vc.advance_receivables_yoy;
+        const adYoyClass = adYoy > 0 ? 'trend-up' : (adYoy < 0 ? 'trend-down' : '');
+        document.getElementById('detail-advance-yoy').textContent = `${adYoy > 0 ? '+' : ''}${adYoy.toFixed(1)}%`;
+        document.getElementById('detail-advance-yoy').className = adYoyClass;
+        
+        // Open modal
+        const modal = document.getElementById('val-chain-modal');
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('active'), 10);
+        lucide.createIcons();
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('val-chain-modal');
+        modal.classList.remove('active');
+        setTimeout(() => modal.style.display = 'none', 250);
+    }
+    
+    // Close modal when click outside of content area
+    window.onclick = function(event) {
+        const modal = document.getElementById('val-chain-modal');
+        if (event.target === modal) {
+            closeModal();
+        }
     }
 
     // Sort function
