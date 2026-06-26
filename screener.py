@@ -42,50 +42,74 @@ def fetch_all_a_shares():
     session = requests.Session()
     params = base_params.copy()
     
+    # 尝试通道一：Eastmoney clist API
     try:
         r = session.get(SPOT_URL, params=params, headers=headers, timeout=15)
         r.raise_for_status()
         data = r.json()
         total = data["data"]["total"]
-        print(f"全市场共 {total} 只股票，开始分页拉取...")
+        print(f"通道一(Eastmoney)联通成功，全市场共 {total} 只股票，开始分页拉取...")
+        
+        all_stocks = []
+        all_stocks.extend(data["data"]["diff"])
+        
+        total_pages = math.ceil(total / 100)
+        for page in range(2, total_pages + 1):
+            params["pn"] = str(page)
+            try:
+                r = session.get(SPOT_URL, params=params, headers=headers, timeout=15)
+                r.raise_for_status()
+                page_data = r.json()["data"]["diff"]
+                all_stocks.extend(page_data)
+                time.sleep(0.02)
+            except Exception as e:
+                print(f"  [Eastmoney] 获取第 {page} 页失败: {e}")
+                continue
+                
+        df = pd.DataFrame(all_stocks)
+        column_mapping = {
+            "f12": "code",
+            "f14": "name",
+            "f2": "price",
+            "f3": "change_pct",
+            "f6": "turnover",
+            "f8": "turnover_rate",
+            "f20": "market_cap",
+            "f21": "circ_market_cap"
+        }
+        df.rename(columns=column_mapping, inplace=True)
+        for col in ["price", "change_pct", "turnover", "turnover_rate", "market_cap", "circ_market_cap"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        print(f"通道一(Eastmoney)拉取完毕，有效标的数: {df.shape[0]}")
+        return df
     except Exception as e:
-        print(f"获取行情首面失败: {e}")
-        return pd.DataFrame()
+        print(f"通道一(Eastmoney)不可达: {e}，正在启动通道二(Sina Spot)...")
         
-    all_stocks = []
-    all_stocks.extend(data["data"]["diff"])
-    
-    total_pages = math.ceil(total / 100)
-    for page in range(2, total_pages + 1):
-        params["pn"] = str(page)
-        try:
-            r = session.get(SPOT_URL, params=params, headers=headers, timeout=15)
-            r.raise_for_status()
-            page_data = r.json()["data"]["diff"]
-            all_stocks.extend(page_data)
-            time.sleep(0.05)
-        except Exception as e:
-            print(f"获取第 {page} 页失败: {e}")
-            continue
+    # 尝试通道二：Sina Spot (防封锁极稳通道)
+    try:
+        df_sina = ak.stock_zh_a_spot()
+        if df_sina is not None and not df_sina.empty:
+            df = df_sina.copy()
+            # Sina 字段映射:
+            # ['代码', '名称', '最新价', '涨跌额', '涨跌幅', '昨收', '今开', '最高', '最低', '成交量', '成交额', '时间戳']
+            # 我们将个股代码提取并转换为6位，并填充临时合格的市值及换手率数据以通过第一阶段初筛
+            df["code"] = df["代码"].str.replace(r"[a-zA-Z]", "", regex=True)
+            df["name"] = df["名称"]
+            df["price"] = pd.to_numeric(df["最新价"], errors="coerce")
+            df["change_pct"] = pd.to_numeric(df["涨跌幅"], errors="coerce")
+            df["turnover"] = pd.to_numeric(df["成交额"], errors="coerce")
+            df["turnover_rate"] = 1.6  # 第一阶段填充临时值 (在合并财务报表后再利用账面资产重构真实换手)
+            df["market_cap"] = 150 * 10**8  # 第一阶段填充临时值 (后续通过股东权益与BPS进行二次校正)
+            df["circ_market_cap"] = 150 * 10**8
             
-    df = pd.DataFrame(all_stocks)
-    column_mapping = {
-        "f12": "code",
-        "f14": "name",
-        "f2": "price",
-        "f3": "change_pct",
-        "f6": "turnover",
-        "f8": "turnover_rate",
-        "f20": "market_cap",
-        "f21": "circ_market_cap"
-    }
-    df.rename(columns=column_mapping, inplace=True)
-    
-    for col in ["price", "change_pct", "turnover", "turnover_rate", "market_cap", "circ_market_cap"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+            # 清洗缺失最新价格 of 死股
+            df = df.dropna(subset=["price", "change_pct"])
+            print(f"通道二(Sina)拉取完毕，有效标的数: {df.shape[0]}")
+            return df[["code", "name", "price", "change_pct", "turnover", "turnover_rate", "market_cap", "circ_market_cap"]]
+    except Exception as e:
+        print(f"通道二(Sina)也拉取失败: {e}")
         
-    print(f"行情拉取完毕，有效标的数: {df.shape[0]}")
-    return df
+    return pd.DataFrame()
 
 def get_recent_quarters():
     """根据当前日期生成近期财报期候选列表 (扩展深度至前三年度以覆盖8季滚动指标)"""
@@ -267,36 +291,15 @@ def fetch_value_chain_data(code):
 def calculate_industry_prosperity(df, board_map):
     """根据行业营收增速、ROE增速、资产周转率增速及价格增速，计算中观行业景气度综合得分"""
     print("开始计算中观行业景气度指数...")
-    # 1. 行业内聚合中位数
+    # 1. 行业内聚合中位数 (直接以当前行情的个股涨跌幅中位数作为行业日涨跌幅代理)
     df_ind = df.groupby("industry").agg(
         ind_rev_growth=("revenue_growth", "median"),
         ind_roe_growth=("roe_change_latest", "median"),
-        ind_cap_growth=("asset_turnover_growth", "median")
+        ind_cap_growth=("asset_turnover_growth", "median"),
+        ind_price_growth=("change_pct", "median")
     ).reset_index()
     
-    # 2. 获取行业价格增速 (板块20d涨幅)
-    ind_price_growths = []
-    for idx, row in df_ind.iterrows():
-        ind_name = row["industry"]
-        price_growth = 0.0
-        if board_map and ind_name in board_map:
-            code = board_map[ind_name]
-            try:
-                end_date = datetime.now().strftime("%Y%m%d")
-                start_date = (datetime.now() - pd.Timedelta(days=40)).strftime("%Y%m%d")
-                df_hist = ak.stock_board_industry_hist_em(symbol=code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
-                if df_hist is not None and len(df_hist) >= 20:
-                    c_latest = df_hist['收盘'].iloc[-1]
-                    c_prev = df_hist['收盘'].iloc[-20]
-                    price_growth = (c_latest - c_prev) / c_prev * 100
-                time.sleep(0.02)
-            except Exception as e:
-                print(f"  [行业景气度] 获取 {ind_name} 板块价格失败: {e}")
-        ind_price_growths.append(price_growth)
-        
-    df_ind["ind_price_growth"] = ind_price_growths
-    
-    # 3. 归一化评分 (0 - 100)
+    # 2. 归一化评分 (0 - 100)
     for col in ["ind_rev_growth", "ind_roe_growth", "ind_cap_growth", "ind_price_growth"]:
         min_v = df_ind[col].min()
         max_v = df_ind[col].max()
@@ -305,7 +308,7 @@ def calculate_industry_prosperity(df, board_map):
         else:
             df_ind[col + "_score"] = (df_ind[col] - min_v) / (max_v - min_v) * 100.0
             
-    # 4. 加权得分计算 (0.3*营收 + 0.3*ROE + 0.2*周转率 + 0.2*价格)
+    # 3. 加权得分计算 (0.3*营收 + 0.3*ROE + 0.2*周转率 + 0.2*价格)
     df_ind["prosperity_score"] = (
         0.3 * df_ind["ind_rev_growth_score"] +
         0.3 * df_ind["ind_roe_growth_score"] +
@@ -355,9 +358,11 @@ def main():
     min_turnover_rate = 1.5
     df_liq = df_filtered[(df_filtered["turnover"] >= min_turnover) & (df_filtered["turnover_rate"] >= min_turnover_rate)]
     
+    is_downgraded = False
     if df_liq.shape[0] < 50:
         print("警告: 严格流动性过滤后标的过少，启动条件降级 (成交额 > 3000万，换手率 > 0.8%)")
         df_liq = df_filtered[(df_filtered["turnover"] >= 30 * 10**6) & (df_filtered["turnover_rate"] >= 0.8)]
+        is_downgraded = True
         
     print(f"市值与流动性初筛完毕，候选池大小: {df_liq.shape[0]}")
     
@@ -365,20 +370,22 @@ def main():
     active_quarters = find_active_quarters(count=8)
     (q0_date, df_q0) = active_quarters[0]
     (q1_date, df_q1) = active_quarters[1]
+    (q2_date, df_q2) = active_quarters[2]
+    (q3_date, df_q3) = active_quarters[3]
     (q4_date, df_q4) = active_quarters[4]
     (q5_date, df_q5) = active_quarters[5]
     (q6_date, df_q6) = active_quarters[6]
     (q7_date, df_q7) = active_quarters[7]
     
-    # 4. 获取资产负债表数据 (计算杜邦分析权益乘数与总资产同比)
+    # 4. 获取资产负债表数据 (计算杜邦分析权益乘数、总资产同比与股东权益合计)
     print(f"拉取资产负债表数据 ({q0_date})...")
     df_zcfz = pd.DataFrame()
     try:
         df_zcfz = ak.stock_zcfz_em(date=q0_date)
         df_zcfz["code_str"] = df_zcfz["股票代码"].astype(str).str.zfill(6)
         
-        cols_to_use = ["code_str", "资产负债率"]
-        col_names = ["code_str", "debt_asset_ratio"]
+        cols_to_use = ["code_str", "资产负债率", "股东权益合计"]
+        col_names = ["code_str", "debt_asset_ratio", "total_equity"]
         if "资产-总资产同比" in df_zcfz.columns:
             cols_to_use.append("资产-总资产同比")
             col_names.append("asset_growth")
@@ -386,36 +393,52 @@ def main():
         df_zcfz_clean = df_zcfz[cols_to_use].copy()
         df_zcfz_clean.columns = col_names
     except Exception as e:
-        print(f"拉取资产负债表失败: {e}，将使用资产负债率与资产增速默认值(0.0)")
-        df_zcfz_clean = pd.DataFrame(columns=["code_str", "debt_asset_ratio", "asset_growth"])
+        print(f"拉取资产负债表失败: {e}，将使用资产负债率与股东权益默认值(0.0)")
+        df_zcfz_clean = pd.DataFrame(columns=["code_str", "debt_asset_ratio", "total_equity", "asset_growth"])
 
     # 5. 数据合并与复筛
     print("开始进行第二阶段筛选（财务二阶导数 + 杜邦健康度 + 盈余现金保障 + 中观行业景气度）...")
     
     df_liq["code_str"] = df_liq["code"].astype(str).str.zfill(6)
     
-    # 整理各季度财务字段
-    df_q0_clean = df_q0[["code_str", "净资产收益率", "销售毛利率", "每股收益", "每股经营现金流量", "营业总收入-同比增长", "净利润-同比增长", "所处行业"]].copy()
-    df_q0_clean.columns = ["code_str", "roe_q0", "margin_q0", "eps_q0", "ocf_q0", "revenue_growth", "net_profit_growth", "industry"]
+    # 整理各季度财务字段并添加 code_str
+    df_q0["code_str"] = df_q0["股票代码"].astype(str).str.zfill(6)
+    df_q0_clean = df_q0[["code_str", "净资产收益率", "销售毛利率", "每股收益", "每股经营现金流量", "营业总收入-同比增长", "净利润-同比增长", "所处行业", "每股净资产"]].copy()
+    df_q0_clean.columns = ["code_str", "roe_q0", "margin_q0", "eps_q0", "ocf_q0", "revenue_growth", "net_profit_growth", "industry", "bps_q0"]
     
+    df_q1["code_str"] = df_q1["股票代码"].astype(str).str.zfill(6)
     df_q1_clean = df_q1[["code_str", "净资产收益率"]].copy()
     df_q1_clean.columns = ["code_str", "roe_q1"]
     
+    df_q2["code_str"] = df_q2["股票代码"].astype(str).str.zfill(6)
+    df_q2_clean = df_q2[["code_str", "净资产收益率"]].copy()
+    df_q2_clean.columns = ["code_str", "roe_q2"]
+    
+    df_q3["code_str"] = df_q3["股票代码"].astype(str).str.zfill(6)
+    df_q3_clean = df_q3[["code_str", "净资产收益率"]].copy()
+    df_q3_clean.columns = ["code_str", "roe_q3"]
+    
+    df_q4["code_str"] = df_q4["股票代码"].astype(str).str.zfill(6)
     df_q4_clean = df_q4[["code_str", "净资产收益率", "销售毛利率"]].copy()
     df_q4_clean.columns = ["code_str", "roe_q4", "margin_q4"]
     
+    df_q5["code_str"] = df_q5["股票代码"].astype(str).str.zfill(6)
     df_q5_clean = df_q5[["code_str", "净资产收益率"]].copy()
     df_q5_clean.columns = ["code_str", "roe_q5"]
     
+    df_q6["code_str"] = df_q6["股票代码"].astype(str).str.zfill(6)
     df_q6_clean = df_q6[["code_str", "净资产收益率"]].copy()
     df_q6_clean.columns = ["code_str", "roe_q6"]
     
+    df_q7["code_str"] = df_q7["股票代码"].astype(str).str.zfill(6)
     df_q7_clean = df_q7[["code_str", "净资产收益率"]].copy()
     df_q7_clean.columns = ["code_str", "roe_q7"]
     
     # 链式合并
     df_merged = pd.merge(df_liq, df_q0_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q1_clean, on="code_str", how="inner")
+    df_merged = pd.merge(df_merged, df_q2_clean, on="code_str", how="inner")
+    df_merged = pd.merge(df_merged, df_q3_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q4_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q5_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q6_clean, on="code_str", how="inner")
@@ -425,50 +448,64 @@ def main():
         df_merged = pd.merge(df_merged, df_zcfz_clean, on="code_str", how="left")
     else:
         df_merged["debt_asset_ratio"] = 0.0
+        df_merged["total_equity"] = 0.0
         df_merged["asset_growth"] = 0.0
         
     df_merged["debt_asset_ratio"] = df_merged["debt_asset_ratio"].fillna(0.0)
+    df_merged["total_equity"] = df_merged["total_equity"].fillna(0.0)
     if "asset_growth" not in df_merged.columns:
         df_merged["asset_growth"] = 0.0
     df_merged["asset_growth"] = df_merged["asset_growth"].fillna(0.0)
     
     # 转换数值
     numeric_cols = [
-        "roe_q0", "roe_q1", "roe_q4", "roe_q5", "roe_q6", "roe_q7",
+        "price", "turnover", "roe_q0", "roe_q1", "roe_q2", "roe_q3", "roe_q4", "roe_q5", "roe_q6", "roe_q7",
         "margin_q0", "margin_q4", "revenue_growth", "net_profit_growth",
-        "eps_q0", "ocf_q0", "debt_asset_ratio", "asset_growth"
+        "eps_q0", "ocf_q0", "debt_asset_ratio", "asset_growth", "total_equity", "bps_q0"
     ]
     for col in numeric_cols:
         df_merged[col] = pd.to_numeric(df_merged[col], errors="coerce")
         
-    # === 计算量化核心指标 ===
+    # === 计算与校正核心指标 ===
     
-    # 1. 季节性平抑的一阶与二阶同比变化量 (行业景气度需要)
+    # A. 依靠财务报表资产数据，反向推导真实的个股总市值与真实换手率 (应对Sina行情通道无市值的数据缺陷)
+    df_merged["bps_q0"] = df_merged["bps_q0"].fillna(1.0)
+    df_merged["calculated_shares"] = df_merged["total_equity"] / df_merged["bps_q0"].clip(lower=0.01)
+    df_merged["real_market_cap_raw"] = df_merged["price"] * df_merged["calculated_shares"] # 以元为单位的市值
+    df_merged["real_market_cap"] = df_merged["real_market_cap_raw"] / 10**8 # 以亿元为单位的市值
+    
+    # 覆盖第一阶段中填入的默认值
+    df_merged["market_cap"] = df_merged["real_market_cap_raw"]
+    df_merged["circ_market_cap"] = df_merged["real_market_cap_raw"]
+    
+    # 精密计算真实换手率 = (当天成交额 / 总市值) * 100
+    df_merged["turnover_rate"] = (df_merged["turnover"] / df_merged["market_cap"].clip(lower=1.0)) * 100.0
+    
+    # B. 季节性平抑的一阶与二阶同比变化量 (行业景气度需要)
     df_merged["roe_change_latest"] = df_merged["roe_q0"] - df_merged["roe_q4"]
     df_merged["roe_change_prev"] = df_merged["roe_q1"] - df_merged["roe_q5"]
     df_merged["roe_acceleration"] = df_merged["roe_change_latest"] - df_merged["roe_change_prev"]
     
-    # 2. 计算资产周转率增速 (作为产能利用率增速的代理)
-    # AT = Revenue / Asset. YoY Change % = (1 + RevGrowth) / (1 + AssetGrowth) - 1
+    # C. 计算资产周转率增速 (作为产能利用率增速的代理)
     df_merged["asset_turnover_growth"] = ((1.0 + df_merged["revenue_growth"].fillna(0.0) / 100.0) / 
                                            (1.0 + df_merged["asset_growth"].fillna(0.0).clip(lower=-99.0) / 100.0) - 1.0) * 100.0
     
-    # 3. 计算行业中观景气度评分及明细映射
+    # D. 计算行业中观景气度评分及明细映射
     prosperity_map, details_map = calculate_industry_prosperity(df_merged, board_map)
     df_merged["industry_prosperity"] = df_merged["industry"].map(prosperity_map).fillna(50.0)
     
-    # 4. 杜邦分析：权益乘数 = 1 / (1 - 资产负债率/100)
+    # E. 杜邦分析：权益乘数 = 1 / (1 - 资产负债率/100)
     df_merged["equity_multiplier"] = 1.0 / (1.0 - (df_merged["debt_asset_ratio"].clip(0.0, 99.0) / 100.0))
     
-    # 5. 收益质量验证：盈余现金保障倍数 = 每股经营现金流 / 每股收益 (OCF / EPS)
+    # F. 收益质量验证：盈余现金保障倍数 = 每股经营现金流 / 每股收益 (OCF / EPS)
     df_merged["cash_coverage"] = df_merged.apply(
         lambda r: r["ocf_q0"] / r["eps_q0"] if r["eps_q0"] > 0 else 0.0, axis=1
     )
     
-    # 6. 毛利率同比变化
+    # G. 毛利率同比变化
     df_merged["margin_change"] = df_merged["margin_q0"] - df_merged["margin_q4"]
     
-    # 7. 过去 8 季度的 ROE 同比变化稳定性 (标准差)
+    # H. 过去 8 季度的 ROE 同比变化稳定性 (标准差)
     c0 = df_merged["roe_q0"] - df_merged["roe_q4"]
     c1 = df_merged["roe_q1"] - df_merged["roe_q5"]
     c2 = df_merged["roe_q2"] - df_merged["roe_q6"]
@@ -476,7 +513,7 @@ def main():
     df_changes = pd.concat([c0, c1, c2, c3], axis=1)
     df_merged["roe_change_std"] = df_changes.std(axis=1)
     
-    # 执行同比抗季节性选股逻辑
+    # 执行同比抗季节性选股逻辑 (转移并整合第二阶段真正的市值与换手率过滤)
     df_final = df_merged[
         (df_merged["roe_q0"] < 12.0) & 
         (df_merged["roe_change_latest"] > 0) &
@@ -486,6 +523,9 @@ def main():
         (df_merged["equity_multiplier"] < 3.0) &
         (df_merged["cash_coverage"] >= 0.5) &
         (df_merged["roe_change_std"] < 2.0) &
+        # 精细化市值与换手率筛选 (转移至此以运用 calculated 真实数值)
+        (df_merged["real_market_cap"] >= 50.0) & (df_merged["real_market_cap"] <= 500.0) & 
+        (df_merged["turnover_rate"] >= (0.8 if is_downgraded else 1.5)) &
         df_merged["roe_q0"].notna() &
         df_merged["roe_q4"].notna() &
         df_merged["roe_q1"].notna() &
