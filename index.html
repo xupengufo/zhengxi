@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>郑希“同比二阶导数”抗季节选股看板</title>
+    <title>郑希“同比二阶导数+杜邦分析”抗季节选股看板</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -438,8 +438,8 @@
     <!-- Header -->
     <header>
         <div class="header-left">
-            <h1>郑希策略同比二阶导数看板</h1>
-            <p><i data-lucide="info"></i> 自动过滤“低ROE同比改善+同比二阶加速+毛利率同比上升+高成长+充足流动性”的标的</p>
+            <h1>郑希策略同比二阶导数 &amp; 杜邦健康看板</h1>
+            <p><i data-lucide="info"></i> 自动过滤“同比二阶加速+杜邦健康去杠杆+收益现金保障+毛利同比上升+高成长+充足流动性”的标的</p>
         </div>
         <div class="update-badge" id="update-badge">
             <span class="pulse"></span>
@@ -453,15 +453,15 @@
         <div class="strategy-intro">
             <div class="pillar-card">
                 <h3>1. ROE 同比二阶加速</h3>
-                <p>当前 ROE 估值适中 (&lt; 12.0%)。相较于去年同期（YoY）实现改善，且<strong>同比改善幅度连续扩大（二阶导数 &gt; 0）</strong>，彻底过滤季节性结算及累计数据扭曲。</p>
+                <p>当前 ROE 估值适中 (&lt; 12.0%)。ROE 同比改善幅度呈<strong>加速度（二阶导数 &gt; 0）</strong>状态，且<strong>过去8季同比波动性低（Std &lt; 2.0%）</strong>，排除重组/一次性暴涨暴跌。</p>
             </div>
             <div class="pillar-card">
-                <h3>2. 销售毛利率同比上升</h3>
-                <p>最新单季毛利率 &gt; 去年同期单季毛利率（YoY），反映企业在产业链上定价权的真实修复与扩张。</p>
+                <h3>2. 杜邦健康度与盈余质量</h3>
+                <p><strong>防雷去杠杆</strong>：最新权益乘数 &lt; 3.0 (负债率 &lt; 66.7%)。<strong>真实经营现金</strong>：盈余现金保障倍数 &ge; 0.5，排除纸面利润与补贴造假。</p>
             </div>
             <div class="pillar-card">
-                <h3>3. 成长验证 &amp; 充足流动性</h3>
-                <p>单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证高成长；日均成交额 &gt; 8000 万且换手率 &gt; 1.5% 保障极速避险能力。</p>
+                <h3>3. 毛利率扩张 &amp; 充足流动性</h3>
+                <p>单季毛利率同比上升反映产品定价权增强。单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证高成长，配合日交易额 &gt; 8000 万以规避流动性踩踏。</p>
             </div>
         </div>
 
@@ -496,11 +496,11 @@
                 <thead>
                     <tr>
                         <th onclick="sortTable('code')">股票代码/名称 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('industry')">所处行业 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('industry')">行业/杜邦杠杆 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('turnover')">成交量能 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('latest_roe')">当前 ROE / 同比改善 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('turnover')">成交量能/现金流 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_roe')">当前 ROE / 同比/稳定度 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('roe_acceleration')">同比二阶加速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('latest_margin')">毛利率 (YoY) <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('margin_change')">同比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
@@ -619,7 +619,10 @@
                         <span class="stock-code">${stock.code}</span>
                     </div>
                 </td>
-                <td><span class="industry-tag">${stock.industry}</span></td>
+                <td>
+                    <span class="industry-tag">${stock.industry}</span>
+                    <span class="stock-code" style="display:block;margin-top:0.25rem;">杠杆 ${stock.equity_multiplier.toFixed(2)}x (EM)</span>
+                </td>
                 <td>
                     <div>${stock.price !== null ? stock.price.toFixed(2) : '-'}</div>
                     <div class="stock-code ${trendClass}">${sign}${changeVal.toFixed(2)}%</div>
@@ -628,10 +631,12 @@
                 <td>
                     <div>${stock.turnover !== null ? stock.turnover.toFixed(1) : '-'} 百万</div>
                     <div class="stock-code">换手 ${stock.turnover_rate !== null ? stock.turnover_rate.toFixed(2) : '-'}%</div>
+                    <div class="stock-code" style="font-size:0.7rem;margin-top:0.15rem;color:var(--primary);font-weight:600;">盈余保障 ${stock.cash_coverage.toFixed(2)}x</div>
                 </td>
                 <td>
                     <div style="margin-bottom: 0.15rem;"><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></div>
                     <div class="stock-code trend-up" style="font-size: 0.75rem; font-weight: 600;">同比 +${stock.roe_change.toFixed(2)}%</div>
+                    <div class="stock-code" style="font-size: 0.7rem;margin-top:0.15rem;">改善稳定度 ${stock.roe_stability.toFixed(2)}%</div>
                 </td>
                 <td>
                     <span class="roe-acc-badge ${accClass}">
