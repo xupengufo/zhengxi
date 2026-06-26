@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>郑希“同比二阶导数+杜邦分析”抗季节选股看板</title>
+    <title>郑希“同比二阶导数+全球联动”量化选股看板</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -438,8 +438,8 @@
     <!-- Header -->
     <header>
         <div class="header-left">
-            <h1>郑希策略同比二阶导数 &amp; 杜邦健康看板</h1>
-            <p><i data-lucide="info"></i> 自动过滤“同比二阶加速+杜邦健康去杠杆+收益现金保障+毛利同比上升+高成长+充足流动性”的标的</p>
+            <h1>郑希策略“中观景气+全球联动”量化看板</h1>
+            <p><i data-lucide="info"></i> 自动过滤“同比二阶加速+中观景气指数+美股映射套利+杜邦健康+盈余保障+高成长+充足流动性”的标的</p>
         </div>
         <div class="update-badge" id="update-badge">
             <span class="pulse"></span>
@@ -452,16 +452,16 @@
         <!-- Strategy pillars -->
         <div class="strategy-intro">
             <div class="pillar-card">
-                <h3>1. ROE 同比二阶加速</h3>
-                <p>当前 ROE 估值适中 (&lt; 12.0%)。ROE 同比改善幅度呈<strong>加速度（二阶导数 &gt; 0）</strong>状态，且<strong>过去8季同比波动性低（Std &lt; 2.0%）</strong>，排除重组/一次性暴涨暴跌。</p>
+                <h3>1. 中观行业景气与全球映射</h3>
+                <p><strong>行业景气度</strong>：0.5*行业均营收增速 + 0.5*行业均净利增速。<strong>全球映射</strong>：测算核心TMT对标美股（AMAT、FN、ON、COHR）近20日相关系数及5日先行回报，发出补涨/防守信号。</p>
             </div>
             <div class="pillar-card">
-                <h3>2. 杜邦健康度与盈余质量</h3>
-                <p><strong>防雷去杠杆</strong>：最新权益乘数 &lt; 3.0 (负债率 &lt; 66.7%)。<strong>真实经营现金</strong>：盈余现金保障倍数 &ge; 0.5，排除纸面利润与补贴造假。</p>
+                <h3>2. ROE同比二阶加速与杜邦质量</h3>
+                <p><strong>二阶加速</strong>：同比改善幅度滚动加速（二阶导数 &gt; 0）。<strong>防雷风控</strong>：权益乘数 &lt; 3.0，盈余现金保障倍数 &ge; 0.5，改善标准差 &lt; 2.0% 过滤波动股。</p>
             </div>
             <div class="pillar-card">
-                <h3>3. 毛利率扩张 &amp; 充足流动性</h3>
-                <p>单季毛利率同比上升反映产品定价权增强。单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证高成长，配合日交易额 &gt; 8000 万以规避流动性踩踏。</p>
+                <h3>3. 定价权验证与充足流动性</h3>
+                <p>单季毛利率同比上升印证定价权扩张。营收同比 &gt; 15% 或净利 &gt; 20% 确证成长，日交易额 &gt; 8000 万保驾极速避险能力。</p>
             </div>
         </div>
 
@@ -495,8 +495,8 @@
             <table id="stocks-table">
                 <thead>
                     <tr>
-                        <th onclick="sortTable('code')">股票代码/名称 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('industry')">行业/杜邦杠杆 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('code')">股票代码/名称/全球联动 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('industry')">行业/中观景气/杜邦杠杆 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('turnover')">成交量能/现金流 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
@@ -612,16 +612,36 @@
             const accClass = stock.roe_acceleration > 0 ? 'acc-positive' : 'acc-negative';
             const accIcon = stock.roe_acceleration > 0 ? '▲' : '▼';
             
+            // Global Linkage Cell building
+            let globalLinkHtml = '';
+            if (stock.global_peer && stock.global_peer !== '无') {
+                const signalClass = stock.global_lead_return > 0 ? 'trend-up' : (stock.global_lead_return < 0 ? 'trend-down' : '');
+                const signalIcon = stock.global_lead_return > 0 ? '▲' : '▼';
+                const signVal = stock.global_lead_return > 0 ? '+' : '';
+                const corrVal = stock.global_correlation !== null ? `r=${stock.global_correlation.toFixed(2)}` : '暂无数据';
+                globalLinkHtml = `
+                    <div style="margin-top: 0.35rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: var(--warning); font-weight: 600;">
+                        <i data-lucide="globe" style="width: 13px; height: 13px;"></i>
+                        <span>${stock.global_peer.split(" ")[1]} (${corrVal})</span>
+                        <span class="${signalClass}" style="font-size: 0.7rem; font-weight: 700; margin-left: 0.2rem;">
+                            ${signalIcon} 5日 ${signVal}${stock.global_lead_return.toFixed(1)}%
+                        </span>
+                    </div>
+                `;
+            }
+            
             tr.innerHTML = `
                 <td>
                     <div class="stock-name-cell">
                         <span class="stock-name">${stock.name}</span>
                         <span class="stock-code">${stock.code}</span>
+                        ${globalLinkHtml}
                     </div>
                 </td>
                 <td>
                     <span class="industry-tag">${stock.industry}</span>
-                    <span class="stock-code" style="display:block;margin-top:0.25rem;">杠杆 ${stock.equity_multiplier.toFixed(2)}x (EM)</span>
+                    <span class="stock-code" style="display:block;margin-top:0.25rem;">中观景气: ${stock.industry_prosperity.toFixed(2)}%</span>
+                    <span class="stock-code" style="display:block;margin-top:0.15rem;">杠杆 ${stock.equity_multiplier.toFixed(2)}x (EM)</span>
                 </td>
                 <td>
                     <div>${stock.price !== null ? stock.price.toFixed(2) : '-'}</div>
@@ -657,6 +677,9 @@
             `;
             tbody.appendChild(tr);
         });
+        
+        // Refresh lucide icons for newly added rows
+        lucide.createIcons();
     }
 
     // Sort function

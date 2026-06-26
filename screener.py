@@ -10,6 +10,14 @@ from datetime import datetime
 # 东方财富 A 股行情 HTTP 接口 (规避 HTTPS TLS 指纹限制)
 SPOT_URL = "http://82.push2.eastmoney.com/api/qt/clist/get"
 
+# 核心 TMT/科技 标的全球联动映射关系：A股代码 -> (美股代码, 友好描述名称)
+GLOBAL_PEER_MAP = {
+    "300308": ("105.FN", "美股 Fabrinet (FN)"),           # 中际旭创 -> Fabrinet (NYSE)
+    "300502": ("106.COHR", "美股 Coherent (COHR)"),       # 新易盛 -> Coherent (NASDAQ)
+    "603501": ("106.ON", "美股 ON Semi (ON)"),            # 韦尔股份 -> ON Semi (NASDAQ)
+    "002371": ("106.AMAT", "美股 Applied Materials (AMAT)") # 北方华创 -> Applied Materials (NASDAQ)
+}
+
 def fetch_all_a_shares():
     """获取全市场 A 股实时行情与市值数据"""
     print("开始获取全市场 A 股实时行情...")
@@ -122,6 +130,45 @@ def format_quarter_name(date_str):
     mapping = {"03": "Q1", "06": "Q2", "09": "Q3", "12": "Q4"}
     return f"{year}{mapping.get(month, 'Q?')}"
 
+def calculate_global_linkage(a_code, us_symbol_full):
+    """计算 A 股股票与美股对标标的过去 30 个交易日的相关系数及美股 5 日收益率"""
+    print(f"  [全球联动] 开始计算 {a_code} 与 {us_symbol_full} 的相关性...")
+    try:
+        end_date = datetime.now().strftime("%Y%m%d")
+        start_date = (datetime.now() - pd.Timedelta(days=45)).strftime("%Y%m%d")
+        
+        # 抓取 A 股前复权历史价格
+        df_a = ak.stock_zh_a_hist(symbol=a_code, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+        # 抓取美股前复权历史价格
+        df_us = ak.stock_us_hist(symbol=us_symbol_full, period="daily", start_date=start_date, end_date=end_date, adjust="qfq")
+        
+        if df_a.empty or df_us.empty:
+            return None, 0.0
+            
+        df_a_clean = df_a[['日期', '收盘']].copy()
+        df_a_clean.columns = ['date', 'close_a']
+        
+        df_us_clean = df_us[['日期', '收盘']].copy()
+        df_us_clean.columns = ['date', 'close_us']
+        
+        df_merged = pd.merge(df_a_clean, df_us_clean, on='date', how='inner')
+        if len(df_merged) < 10:
+            return None, 0.0
+            
+        corr = df_merged['close_a'].corr(df_merged['close_us'])
+        
+        # 计算美股过去 5 个交易日的涨跌幅
+        us_5d_ret = 0.0
+        if len(df_us) >= 5:
+            latest_close = df_us['收盘'].iloc[-1]
+            prev_5d_close = df_us['收盘'].iloc[-5]
+            us_5d_ret = (latest_close - prev_5d_close) / prev_5d_close * 100
+            
+        return round(corr, 2), round(us_5d_ret, 2)
+    except Exception as e:
+        print(f"  [全球联动] {a_code} 对标 {us_symbol_full} 计算失败: {e}")
+        return None, 0.0
+
 def main():
     start_time = time.time()
     
@@ -151,14 +198,12 @@ def main():
     
     # 3. 动态获取最近 8 个季度的财务数据 (计算同比二阶加速度 + 过去8季同比波动率)
     active_quarters = find_active_quarters(count=8)
-    (q0_date, df_q0) = active_quarters[0]  # 最新季度 t
-    (q1_date, df_q1) = active_quarters[1]  # 前一季度 t-1
-    (q2_date, df_q2) = active_quarters[2]  # t-2
-    (q3_date, df_q3) = active_quarters[3]  # t-3
-    (q4_date, df_q4) = active_quarters[4]  # 去年同期 t-4
-    (q5_date, df_q5) = active_quarters[5]  # t-5
-    (q6_date, df_q6) = active_quarters[6]  # t-6
-    (q7_date, df_q7) = active_quarters[7]  # t-7
+    (q0_date, df_q0) = active_quarters[0]
+    (q1_date, df_q1) = active_quarters[1]
+    (q4_date, df_q4) = active_quarters[4]
+    (q5_date, df_q5) = active_quarters[5]
+    (q6_date, df_q6) = active_quarters[6]
+    (q7_date, df_q7) = active_quarters[7]
     
     # 4. 获取资产负债表数据 (计算杜邦分析权益乘数)
     print(f"拉取资产负债表数据 ({q0_date})...")
@@ -172,8 +217,8 @@ def main():
         print(f"拉取资产负债表失败: {e}，将使用资产负债率默认值(0.0)")
         df_zcfz_clean = pd.DataFrame(columns=["code_str", "debt_asset_ratio"])
 
-    # 5. 数据合并与二阶同比拐点筛选 + 质量指标 + 稳定性
-    print("开始进行第二阶段筛选（财务二阶导数 + 杜邦健康度 + 盈余现金保障 + 波动率）...")
+    # 5. 数据合并与复筛
+    print("开始进行第二阶段筛选（财务二阶导数 + 杜邦健康度 + 盈余现金保障 + 中观行业景气度）...")
     
     df_liq["code_str"] = df_liq["code"].astype(str).str.zfill(6)
     
@@ -183,12 +228,6 @@ def main():
     
     df_q1_clean = df_q1[["code_str", "净资产收益率"]].copy()
     df_q1_clean.columns = ["code_str", "roe_q1"]
-    
-    df_q2_clean = df_q2[["code_str", "净资产收益率"]].copy()
-    df_q2_clean.columns = ["code_str", "roe_q2"]
-    
-    df_q3_clean = df_q3[["code_str", "净资产收益率"]].copy()
-    df_q3_clean.columns = ["code_str", "roe_q3"]
     
     df_q4_clean = df_q4[["code_str", "净资产收益率", "销售毛利率"]].copy()
     df_q4_clean.columns = ["code_str", "roe_q4", "margin_q4"]
@@ -205,14 +244,11 @@ def main():
     # 链式合并
     df_merged = pd.merge(df_liq, df_q0_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q1_clean, on="code_str", how="inner")
-    df_merged = pd.merge(df_merged, df_q2_clean, on="code_str", how="inner")
-    df_merged = pd.merge(df_merged, df_q3_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q4_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q5_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q6_clean, on="code_str", how="inner")
     df_merged = pd.merge(df_merged, df_q7_clean, on="code_str", how="inner")
     
-    # 合并资产负债率
     if not df_zcfz_clean.empty:
         df_merged = pd.merge(df_merged, df_zcfz_clean, on="code_str", how="left")
     else:
@@ -222,7 +258,7 @@ def main():
     
     # 转换数值
     numeric_cols = [
-        "roe_q0", "roe_q1", "roe_q2", "roe_q3", "roe_q4", "roe_q5", "roe_q6", "roe_q7",
+        "roe_q0", "roe_q1", "roe_q4", "roe_q5", "roe_q6", "roe_q7",
         "margin_q0", "margin_q4", "revenue_growth", "net_profit_growth",
         "eps_q0", "ocf_q0", "debt_asset_ratio"
     ]
@@ -231,44 +267,39 @@ def main():
         
     # === 计算量化核心指标 ===
     
-    # 1. 杜邦分析：权益乘数 = 1 / (1 - 资产负债率/100)
+    # 1. 中观行业景气度综合指数（在合并全市场数据后，按行业计算平均增速）
+    # 使用 0.5 * 行业平均营收增速 + 0.5 * 行业平均净利增速 来作为“行业中观景气度”
+    df_merged["ind_avg_rev_growth"] = df_merged.groupby("industry")["revenue_growth"].transform("mean")
+    df_merged["ind_avg_net_profit_growth"] = df_merged.groupby("industry")["net_profit_growth"].transform("mean")
+    df_merged["industry_prosperity"] = 0.5 * df_merged["ind_avg_rev_growth"] + 0.5 * df_merged["ind_avg_net_profit_growth"]
+    
+    # 2. 杜邦分析：权益乘数 = 1 / (1 - 资产负债率/100)
     df_merged["equity_multiplier"] = 1.0 / (1.0 - (df_merged["debt_asset_ratio"].clip(0.0, 99.0) / 100.0))
     
-    # 2. 收益质量验证：盈余现金保障倍数 = 每股经营现金流 / 每股收益 (OCF / EPS)
+    # 3. 收益质量验证：盈余现金保障倍数 = 每股经营现金流 / 每股收益 (OCF / EPS)
     df_merged["cash_coverage"] = df_merged.apply(
         lambda r: r["ocf_q0"] / r["eps_q0"] if r["eps_q0"] > 0 else 0.0, axis=1
     )
     
-    # 3. 季节性平抑的一阶同比变化量
+    # 4. 季节性平抑的一阶同比变化量
     df_merged["roe_change_latest"] = df_merged["roe_q0"] - df_merged["roe_q4"]
     df_merged["roe_change_prev"] = df_merged["roe_q1"] - df_merged["roe_q5"]
     
-    # 4. 同比加速度 (二阶导数)
+    # 5. 同比加速度 (二阶导数)
     df_merged["roe_acceleration"] = df_merged["roe_change_latest"] - df_merged["roe_change_prev"]
     
-    # 5. 毛利率同比变化
+    # 6. 毛利率同比变化
     df_merged["margin_change"] = df_merged["margin_q0"] - df_merged["margin_q4"]
     
-    # 6. 过去 8 季度的 ROE 同比变化稳定性 (标准差)
-    # 计算过去 4 期滚动的同比改善差
+    # 7. 过去 8 季度的 ROE 同比变化稳定性 (标准差)
     c0 = df_merged["roe_q0"] - df_merged["roe_q4"]
     c1 = df_merged["roe_q1"] - df_merged["roe_q5"]
     c2 = df_merged["roe_q2"] - df_merged["roe_q6"]
     c3 = df_merged["roe_q3"] - df_merged["roe_q7"]
     df_changes = pd.concat([c0, c1, c2, c3], axis=1)
-    # 计算同比改善值的标准差 (Std)，反映是否是稳定的“同比良性演进”而不是“暴涨暴跌的重组收益”
     df_merged["roe_change_std"] = df_changes.std(axis=1)
     
-    # 执行郑希财务改善 + 质量与防雷升级版选股逻辑：
-    # A. 阶段合理性：最新季度 ROE < 12.0%
-    # B. 同比改善：最新季度 ROE 同比实现正增长 (roe_change_latest > 0)
-    # C. 二阶同比加速：ROE 同比改善幅度在扩大 (roe_acceleration > 0)
-    # D. 毛利率同比提升：最新季度销售毛利率 > 去年同期销售毛利率 (margin_change > 0)
-    # E. 高成长验证：营收同比增速 > 15% 或 净利润同比增速 > 20%
-    # F. 杜邦质量红线：杠杆适度，权益乘数 < 3.0 (等价于资产负债率 < 66.67%)
-    # G. 收益质量验证：盈余现金保障倍数 (现金流/净利润比率) > 0.5 (排除依靠非经常项目美化报表的公司)
-    # H. 业绩稳定性：同比改善标准差 < 2.0% (排除 ROE 同比波动极大的不确定股票)
-    # I. 数据完整性过滤
+    # 执行同比抗季节性选股逻辑
     df_final = df_merged[
         (df_merged["roe_q0"] < 12.0) & 
         (df_merged["roe_change_latest"] > 0) &
@@ -289,13 +320,27 @@ def main():
     # 按净利润同比增速降序排列
     df_final.sort_values(by="net_profit_growth", ascending=False, inplace=True)
     
-    print(f"二阶财务 + 杜邦健康度 + 盈余现金筛选完毕，最终选定标的数: {df_final.shape[0]}")
+    print(f"二阶财务筛选完毕，最终选定标的数: {df_final.shape[0]}")
     
-    # 6. 格式化输出为 JSON
+    # 6. 计算全球美股联动相关系数 (仅针对最终选定的标的中属于核心科技龙头的股)
     stock_list = []
     for _, row in df_final.iterrows():
+        a_code = row["code_str"]
+        global_peer = "无"
+        global_corr = None
+        global_lead_ret = 0.0
+        
+        # 判断是否在联动映射表内
+        if a_code in GLOBAL_PEER_MAP:
+            us_symbol, us_name = GLOBAL_PEER_MAP[a_code]
+            global_peer = us_name
+            # 计算相关系数
+            corr, us_ret = calculate_global_linkage(a_code, us_symbol)
+            global_corr = corr
+            global_lead_ret = us_ret
+            
         stock_list.append({
-            "code": row["code_str"],
+            "code": a_code,
             "name": row["name"],
             "price": round(row["price"], 2) if not math.isnan(row["price"]) else None,
             "change_pct": round(row["change_pct"], 2) if not math.isnan(row["change_pct"]) else None,
@@ -304,17 +349,20 @@ def main():
             "turnover_rate": round(row["turnover_rate"], 2) if not math.isnan(row["turnover_rate"]) else None,
             "latest_roe": round(row["roe_q0"], 2),
             "prev_year_roe": round(row["roe_q4"], 2),
-            "roe_change": round(row["roe_change_latest"], 2), # 同比改善值
-            "roe_acceleration": round(row["roe_acceleration"], 2), # 同比加速度
+            "roe_change": round(row["roe_change_latest"], 2), 
+            "roe_acceleration": round(row["roe_acceleration"], 2), 
             "latest_margin": round(row["margin_q0"], 2),
             "prev_year_margin": round(row["margin_q4"], 2),
-            "margin_change": round(row["margin_change"], 2), # 毛利率同比改善值
+            "margin_change": round(row["margin_change"], 2), 
             "revenue_growth": round(row["revenue_growth"], 2) if not math.isnan(row["revenue_growth"]) else None,
             "net_profit_growth": round(row["net_profit_growth"], 2) if not math.isnan(row["net_profit_growth"]) else None,
             "equity_multiplier": round(row["equity_multiplier"], 2),
             "cash_coverage": round(row["cash_coverage"], 2),
             "roe_stability": round(row["roe_change_std"], 2),
-            "industry": row["industry"] if isinstance(row["industry"], str) else "其它"
+            "industry_prosperity": round(row["industry_prosperity"], 2) if not math.isnan(row["industry_prosperity"]) else 0.0,
+            "global_peer": global_peer,
+            "global_correlation": global_corr,
+            "global_lead_return": global_lead_ret
         })
         
     output_data = {
