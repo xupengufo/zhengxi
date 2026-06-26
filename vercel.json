@@ -1,0 +1,13 @@
+{
+  "cleanUrls": true,
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "results.json",
+      "use": "@vercel/static"
+    }
+  ]
+}
