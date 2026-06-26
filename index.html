@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>郑希“景气周期二阶导数”量化选股看板</title>
+    <title>郑希“同比二阶导数”抗季节选股看板</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -438,8 +438,8 @@
     <!-- Header -->
     <header>
         <div class="header-left">
-            <h1>郑希策略二阶导数选股看板</h1>
-            <p><i data-lucide="info"></i> 自动过滤“低ROE二阶加速+毛利率环比提升+高成长验证+充足流动性”的科技标的</p>
+            <h1>郑希策略同比二阶导数看板</h1>
+            <p><i data-lucide="info"></i> 自动过滤“低ROE同比改善+同比二阶加速+毛利率同比上升+高成长+充足流动性”的标的</p>
         </div>
         <div class="update-badge" id="update-badge">
             <span class="pulse"></span>
@@ -452,16 +452,16 @@
         <!-- Strategy pillars -->
         <div class="strategy-intro">
             <div class="pillar-card">
-                <h3>1. ROE 二阶加速度 &gt; 0</h3>
-                <p>当前 ROE 估值适中 (&lt; 12.0%)。核心引入二阶导数：ROE 一阶变动为正且其改善斜率呈现<strong>加速度</strong>状态，精准捕捉产业大周期上升拐点。</p>
+                <h3>1. ROE 同比二阶加速</h3>
+                <p>当前 ROE 估值适中 (&lt; 12.0%)。相较于去年同期（YoY）实现改善，且<strong>同比改善幅度连续扩大（二阶导数 &gt; 0）</strong>，彻底过滤季节性结算及累计数据扭曲。</p>
             </div>
             <div class="pillar-card">
-                <h3>2. 销售毛利率环比上升</h3>
-                <p>最新季度毛利率 &gt; 上季度毛利率，用微观产品盈利能力（定价权）改善，来佐证行业景气度的回升。</p>
+                <h3>2. 销售毛利率同比上升</h3>
+                <p>最新单季毛利率 &gt; 去年同期单季毛利率（YoY），反映企业在产业链上定价权的真实修复与扩张。</p>
             </div>
             <div class="pillar-card">
                 <h3>3. 成长验证 &amp; 充足流动性</h3>
-                <p>单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证景气度；日均成交额 &gt; 8000 万且换手率 &gt; 1.5%，保障极速撤退能力。</p>
+                <p>单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证高成长；日均成交额 &gt; 8000 万且换手率 &gt; 1.5% 保障极速避险能力。</p>
             </div>
         </div>
 
@@ -473,7 +473,7 @@
             </div>
             <div class="stat-card">
                 <div class="value" id="stat-margin-change">-</div>
-                <div class="label">平均毛利提升</div>
+                <div class="label">平均毛利同比提升</div>
             </div>
         </div>
     </div>
@@ -500,10 +500,10 @@
                         <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('turnover')">成交量能 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('latest_roe')">当前 ROE / 一阶改善 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('roe_acceleration')">二阶加速度 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('latest_margin')">毛利率 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('margin_change')">毛利率环比 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_roe')">当前 ROE / 同比改善 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('roe_acceleration')">同比二阶加速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_margin')">毛利率 (YoY) <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('margin_change')">同比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('net_profit_growth')">归母净利增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('revenue_growth')">营业收入增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                     </tr>
@@ -543,7 +543,7 @@
             filteredStocks = [...allStocks];
             
             // Render updates info
-            document.getElementById('update-time-text').textContent = `最后更新：${data.update_time} (${data.latest_quarter} 财报数据)`;
+            document.getElementById('update-time-text').textContent = `最后更新：${data.update_time} (${data.latest_quarter} 同比分析数据)`;
             document.getElementById('stat-count').textContent = allStocks.length;
             
             // Calculate average margin change
@@ -631,7 +631,7 @@
                 </td>
                 <td>
                     <div style="margin-bottom: 0.15rem;"><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></div>
-                    <div class="stock-code trend-up" style="font-size: 0.75rem; font-weight: 600;">季改 +${stock.roe_change.toFixed(2)}%</div>
+                    <div class="stock-code trend-up" style="font-size: 0.75rem; font-weight: 600;">同比 +${stock.roe_change.toFixed(2)}%</div>
                 </td>
                 <td>
                     <span class="roe-acc-badge ${accClass}">
@@ -640,7 +640,7 @@
                 </td>
                 <td>
                     <div>${stock.latest_margin.toFixed(2)}%</div>
-                    <div class="stock-code">前值 ${stock.prev_margin.toFixed(2)}%</div>
+                    <div class="stock-code">去同 ${stock.prev_year_margin.toFixed(2)}%</div>
                 </td>
                 <td><span class="margin-badge">+${stock.margin_change.toFixed(2)}%</span></td>
                 <td class="${stock.net_profit_growth > 0 ? 'trend-up' : (stock.net_profit_growth < 0 ? 'trend-down' : '')}">
