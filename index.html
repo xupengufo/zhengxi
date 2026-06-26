@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>郑希“景气周期拼接”量化选股看板</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 28, 45, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.15);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.15);
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --glass-bg: rgba(17, 24, 39, 0.7);
+            --glass-blur: blur(12px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.08) 0px, transparent 50%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem 1.5rem;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Header Area */
+        header {
+            margin-bottom: 2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 1.5rem;
+        }
+
+        .header-left h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, #9ca3af 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header-left p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .update-badge {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            height: fit-content;
+        }
+
+        .update-badge .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Dashboard Overview Grid */
+        .overview-grid {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .overview-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Strategy Card */
+        .strategy-intro {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: var(--glass-blur);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .strategy-intro {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pillar-card {
+            border-left: 3px solid var(--primary);
+            padding-left: 1rem;
+        }
+
+        .pillar-card:nth-child(2) { border-left-color: var(--success); }
+        .pillar-card:nth-child(3) { border-left-color: var(--warning); }
+
+        .pillar-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .pillar-card p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Stats Cards */
+        .stats-wrapper {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.25rem;
+            backdrop-filter: var(--glass-blur);
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card:nth-child(2) .value { color: var(--success); }
+
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Interactive Toolbar */
+        .toolbar {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            backdrop-filter: var(--glass-blur);
+        }
+
+        .search-wrapper {
+            position: relative;
+            flex-grow: 1;
+            max-width: 400px;
+        }
+
+        .search-wrapper i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            width: 18px;
+            height: 18px;
+        }
+
+        .search-input {
+            width: 100%;
+            background: rgba(17, 24, 39, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-tag {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-tag:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .filter-tag.active {
+            background: var(--primary-glow);
+            border-color: var(--primary);
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* Table Card */
+        .table-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            overflow: hidden;
+            backdrop-filter: var(--glass-blur);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(17, 24, 39, 0.4);
+            padding: 1.1rem 1.25rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--card-border);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+            white-space: nowrap;
+        }
+
+        th:hover {
+            background: rgba(17, 24, 39, 0.8);
+            color: var(--text-primary);
+        }
+
+        th .sort-icon {
+            display: inline-flex;
+            vertical-align: middle;
+            margin-left: 0.25rem;
+            width: 14px;
+            height: 14px;
+        }
+
+        td {
+            padding: 1.1rem 1.25rem;
+            border-bottom: 1px solid var(--card-border);
+            color: var(--text-primary);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .stock-name-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .stock-code {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .stock-name {
+            font-weight: 600;
+        }
+
+        .industry-tag {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            border: 1px solid var(--card-border);
+        }
+
+        /* Badges & Color codings */
+        .trend-up {
+            color: var(--success);
+        }
+        
+        .trend-down {
+            color: var(--danger);
+        }
+
+        .roe-badge {
+            background: var(--primary-glow);
+            color: var(--primary);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .margin-badge {
+            background: var(--success-glow);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        /* Empty State */
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            width: 48px;
+            height: 48px;
+            color: var(--card-border);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--card-border);
+            padding-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <header>
+        <div class="header-left">
+            <h1>郑希策略选股看板</h1>
+            <p><i data-lucide="info"></i> 自动筛选符合“低ROE向好+充足流动性+高成长弹性”的标的</p>
+        </div>
+        <div class="update-badge" id="update-badge">
+            <span class="pulse"></span>
+            <span id="update-time-text">正在加载数据...</span>
+        </div>
+    </header>
+
+    <!-- Overview Grid -->
+    <div class="overview-grid">
+        <!-- Strategy pillars -->
+        <div class="strategy-intro">
+            <div class="pillar-card">
+                <h3>1. 低 ROE 改善</h3>
+                <p>买在公司 ROE 从低向高爬升的起点（当前季度 ROE &lt; 8.0%），且最新季度销售毛利率出现环比提升，证明产业议价能力拐点已现。</p>
+            </div>
+            <div class="pillar-card">
+                <h3>2. 充足流动性</h3>
+                <p>每日成交额 &gt; 8000 万且换手率 &gt; 1.5%。流动性好有利于选错时迅速撤离，防止落入中小盘流动性危机陷阱。</p>
+            </div>
+            <div class="pillar-card">
+                <h3>3. 业绩增速验证</h3>
+                <p>营业收入同比增速 &gt; 15% 或净利润同比增速 &gt; 20%，通过真实的销售及业绩成长来佐证产业周期的景气上行。</p>
+            </div>
+        </div>
+
+        <!-- Quick Statistics -->
+        <div class="stats-wrapper">
+            <div class="stat-card">
+                <div class="value" id="stat-count">-</div>
+                <div class="label">今日筛选标的</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="stat-margin-change">-</div>
+                <div class="label">平均毛利提升</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar Filters -->
+    <div class="toolbar">
+        <div class="search-wrapper">
+            <i data-lucide="search"></i>
+            <input type="text" id="search-input" class="search-input" placeholder="输入股票名称 / 代码 / 行业...">
+        </div>
+        <div class="filter-tags" id="industry-filters">
+            <button class="filter-tag active" data-industry="all">全部行业</button>
+        </div>
+    </div>
+
+    <!-- Table Card -->
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table id="stocks-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('code')">股票代码/名称 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('industry')">所处行业 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('turnover')">成交量能 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_roe')">当前季度 ROE <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_margin')">毛利率 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('margin_change')">环比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('net_profit_growth')">归母净利增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('revenue_growth')">营业收入增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                    </tr>
+                </thead>
+                <tbody id="stocks-tbody">
+                    <!-- Dynamic rendering rows -->
+                </tbody>
+            </table>
+        </div>
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <i data-lucide="alert-circle"></i>
+            <h3>未找到匹配的股票</h3>
+            <p>请尝试清理搜索关键词或选择其他行业筛选器。</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>数据源自 AKShare 离线自动计算 • Vercel 静态节点分发 • 投资有风险，决策须谨慎</p>
+    </footer>
+</div>
+
+<script>
+    let allStocks = [];
+    let filteredStocks = [];
+    let currentSortField = 'net_profit_growth';
+    let currentSortOrder = 'desc'; // 'asc' or 'desc'
+    let currentIndustryFilter = 'all';
+
+    // Fetch and render data
+    async function init() {
+        try {
+            const response = await fetch('results.json');
+            const data = await response.json();
+            
+            allStocks = data.stocks || [];
+            filteredStocks = [...allStocks];
+            
+            // Render updates info
+            document.getElementById('update-time-text').textContent = `最后更新：${data.update_time} (${data.latest_quarter} 财报数据)`;
+            document.getElementById('stat-count').textContent = allStocks.length;
+            
+            // Calculate average margin change
+            if (allStocks.length > 0) {
+                const avgMargin = allStocks.reduce((sum, item) => sum + item.margin_change, 0) / allStocks.length;
+                document.getElementById('stat-margin-change').textContent = `+${avgMargin.toFixed(2)}%`;
+            } else {
+                document.getElementById('stat-margin-change').textContent = '0.00%';
+            }
+            
+            // Generate industry filter buttons
+            buildIndustryFilters();
+            
+            // Perform default sort and render
+            sortData(currentSortField, currentSortOrder);
+            renderTable();
+            
+            // Refresh lucide icons
+            lucide.createIcons();
+        } catch (error) {
+            console.error("加载数据失败:", error);
+            document.getElementById('update-time-text').textContent = "数据加载失败，请检查 results.json 是否生成。";
+        }
+    }
+
+    // Generate industry filter lists
+    function buildIndustryFilters() {
+        const industries = new Set();
+        allStocks.forEach(stock => {
+            if (stock.industry) industries.add(stock.industry);
+        });
+        
+        const filterContainer = document.getElementById('industry-filters');
+        industries.forEach(ind => {
+            const btn = document.createElement('button');
+            btn.className = 'filter-tag';
+            btn.textContent = ind;
+            btn.dataset.industry = ind;
+            btn.addEventListener('click', () => filterByIndustry(ind));
+            filterContainer.appendChild(btn);
+        });
+    }
+
+    // Render Table Body
+    function renderTable() {
+        const tbody = document.getElementById('stocks-tbody');
+        const emptyState = document.getElementById('empty-state');
+        tbody.innerHTML = '';
+        
+        if (filteredStocks.length === 0) {
+            emptyState.style.display = 'block';
+            return;
+        }
+        
+        emptyState.style.display = 'none';
+        
+        filteredStocks.forEach(stock => {
+            const tr = document.createElement('tr');
+            
+            // Price Trend Class
+            const changeVal = stock.change_pct || 0;
+            const trendClass = changeVal > 0 ? 'trend-up' : (changeVal < 0 ? 'trend-down' : '');
+            const sign = changeVal > 0 ? '+' : '';
+            
+            tr.innerHTML = `
+                <td>
+                    <div class="stock-name-cell">
+                        <span class="stock-name">${stock.name}</span>
+                        <span class="stock-code">${stock.code}</span>
+                    </div>
+                </td>
+                <td><span class="industry-tag">${stock.industry}</span></td>
+                <td>
+                    <div>${stock.price !== null ? stock.price.toFixed(2) : '-'}</div>
+                    <div class="stock-code ${trendClass}">${sign}${changeVal.toFixed(2)}%</div>
+                </td>
+                <td>${stock.market_cap !== null ? stock.market_cap.toFixed(2) : '-'} 亿</td>
+                <td>
+                    <div>${stock.turnover !== null ? stock.turnover.toFixed(1) : '-'} 百万</div>
+                    <div class="stock-code">换手 ${stock.turnover_rate !== null ? stock.turnover_rate.toFixed(2) : '-'}%</div>
+                </td>
+                <td><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></td>
+                <td>
+                    <div>${stock.latest_margin.toFixed(2)}%</div>
+                    <div class="stock-code">前值 ${stock.prev_margin.toFixed(2)}%</div>
+                </td>
+                <td><span class="margin-badge">+${stock.margin_change.toFixed(2)}%</span></td>
+                <td class="${stock.net_profit_growth > 0 ? 'trend-up' : (stock.net_profit_growth < 0 ? 'trend-down' : '')}">
+                    ${stock.net_profit_growth !== null ? (stock.net_profit_growth > 0 ? '+' : '') + stock.net_profit_growth.toFixed(2) + '%' : '-'}
+                </td>
+                <td class="${stock.revenue_growth > 0 ? 'trend-up' : (stock.revenue_growth < 0 ? 'trend-down' : '')}">
+                    ${stock.revenue_growth !== null ? (stock.revenue_growth > 0 ? '+' : '') + stock.revenue_growth.toFixed(2) + '%' : '-'}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Sort function
+    function sortData(field, order) {
+        filteredStocks.sort((a, b) => {
+            let valA = a[field];
+            let valB = b[field];
+            
+            // Handle null values
+            if (valA === null || valA === undefined) return order === 'asc' ? -1 : 1;
+            if (valB === null || valB === undefined) return order === 'asc' ? 1 : -1;
+            
+            if (typeof valA === 'string') {
+                return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+            } else {
+                return order === 'asc' ? valA - valB : valB - valA;
+            }
+        });
+    }
+
+    // Trigger Sort on Header click
+    function sortTable(field) {
+        if (currentSortField === field) {
+            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSortField = field;
+            currentSortOrder = 'desc'; // default is desc for rates/numbers
+        }
+        
+        sortData(currentSortField, currentSortOrder);
+        renderTable();
+    }
+
+    // Filter by industry
+    function filterByIndustry(ind) {
+        currentIndustryFilter = ind;
+        
+        // Update button styles
+        document.querySelectorAll('.filter-tag').forEach(btn => {
+            if (btn.dataset.industry === ind) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        applyFilters();
+    }
+
+    // Search and filters combined
+    function applyFilters() {
+        const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
+        
+        filteredStocks = allStocks.filter(stock => {
+            // Industry filter
+            const matchesIndustry = (currentIndustryFilter === 'all' || stock.industry === currentIndustryFilter);
+            
+            // Search text filter
+            const matchesSearch = (!searchVal || 
+                stock.name.toLowerCase().includes(searchVal) || 
+                stock.code.includes(searchVal) || 
+                (stock.industry && stock.industry.toLowerCase().includes(searchVal))
+            );
+            
+            return matchesIndustry && matchesSearch;
+        });
+        
+        // Keep sorting
+        sortData(currentSortField, currentSortOrder);
+        renderTable();
+    }
+
+    // Event listeners
+    document.getElementById('search-input').addEventListener('input', applyFilters);
+    document.querySelector('.filter-tag[data-industry="all"]').addEventListener('click', () => filterByIndustry('all'));
+
+    // Start
+    window.onload = init;
+</script>
+</body>
+</html>
