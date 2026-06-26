@@ -29,6 +29,7 @@ def fetch_all_a_shares():
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         "Accept": "*/*",
+        "Referer": "http://quote.eastmoney.com/",
     }
     
     session = requests.Session()
@@ -56,13 +57,12 @@ def fetch_all_a_shares():
             r.raise_for_status()
             page_data = r.json()["data"]["diff"]
             all_stocks.extend(page_data)
-            time.sleep(0.05) # 适当微调延迟
+            time.sleep(0.05)
         except Exception as e:
             print(f"获取第 {page} 页失败: {e}")
             continue
             
     df = pd.DataFrame(all_stocks)
-    # 重命名列
     column_mapping = {
         "f12": "code",
         "f14": "name",
@@ -75,7 +75,6 @@ def fetch_all_a_shares():
     }
     df.rename(columns=column_mapping, inplace=True)
     
-    # 转换为数值类型
     for col in ["price", "change_pct", "turnover", "turnover_rate", "market_cap", "circ_market_cap"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
         
@@ -87,7 +86,7 @@ def get_recent_quarters():
     now = datetime.now()
     year = now.year
     candidates = []
-    for y in [year, year - 1]:
+    for y in [year, year - 1, year - 2]:
         for q in ["1231", "0930", "0630", "0331"]:
             candidates.append(f"{y}{q}")
     
@@ -96,28 +95,27 @@ def get_recent_quarters():
     candidates.sort(reverse=True)
     return candidates
 
-def find_active_quarters():
-    """动态探测并获取最近两个有完整财务数据的季度"""
-    print("开始探测财务报表活跃季度...")
+def find_active_quarters(count=3):
+    """动态探测并获取最近 count 个有完整财务数据的季度"""
+    print(f"开始探测最近 {count} 个财务报表活跃季度...")
     candidates = get_recent_quarters()
     active = []
     for date in candidates:
         try:
             df = ak.stock_yjbb_em(date=date)
-            # 行数大于2000说明此季度财报已披露大部分数据
             if df is not None and df.shape[0] > 2000:
                 print(f"季度 {date} 处于活跃状态，数据行数: {df.shape[0]}")
                 active.append((date, df))
-                if len(active) == 2:
+                if len(active) == count:
                     break
         except Exception as e:
             print(f"季度 {date} 探测失败: {e}")
             continue
             
-    if len(active) < 2:
-        raise ValueError("无法获取至少两个活跃季度财务数据！")
+    if len(active) < count:
+        raise ValueError(f"无法获取至少 {count} 个活跃季度财务数据！")
         
-    return active[0], active[1]
+    return active
 
 def format_quarter_name(date_str):
     """格式化财报期名称，如 '20260331' -> '2026Q1'"""
@@ -135,44 +133,41 @@ def main():
         print("行情数据为空，程序退出。")
         return
         
-    # 2. 市值与流动性初筛 (郑希策略：流动性优先，中小市值)
-    # 总市值限制在 50 亿 - 500 亿 (RMB)
-    # 成交额 > 8000 万，换手率 > 1.5% (若无符合条件，降级筛选)
+    # 2. 市值与流动性初筛
     print("开始执行第一阶段筛选（市值与流动性）...")
-    
-    # 剔除 ST 股票
     df_filtered = df_spot[~df_spot["name"].str.contains("ST|退", na=True)]
     
-    # 市值过滤
-    min_cap = 50 * 10**8  # 50亿
-    max_cap = 500 * 10**8 # 500亿
+    # 总市值限制在 50 亿 - 500 亿 (RMB)
+    min_cap = 50 * 10**8
+    max_cap = 500 * 10**8
     df_filtered = df_filtered[(df_filtered["market_cap"] >= min_cap) & (df_filtered["market_cap"] <= max_cap)]
     
-    # 流动性过滤 (成交额 > 8000万，换手率 > 1.5%)
+    # 流动性过滤
     min_turnover = 80 * 10**6
     min_turnover_rate = 1.5
-    
     df_liq = df_filtered[(df_filtered["turnover"] >= min_turnover) & (df_filtered["turnover_rate"] >= min_turnover_rate)]
     
-    # 容错处理：如果初筛后标的极少，则自动降级过滤条件
     if df_liq.shape[0] < 50:
         print("警告: 严格流动性过滤后标的过少，启动条件降级 (成交额 > 3000万，换手率 > 0.8%)")
         df_liq = df_filtered[(df_filtered["turnover"] >= 30 * 10**6) & (df_filtered["turnover_rate"] >= 0.8)]
         
     print(f"市值与流动性初筛完毕，候选池大小: {df_liq.shape[0]}")
     
-    # 3. 动态获取最近两个季度的财务数据
-    (latest_date, df_latest), (prev_date, df_prev) = find_active_quarters()
+    # 3. 动态获取最近 3 个季度的财务数据 (计算二阶加速度)
+    active_quarters = find_active_quarters(count=3)
+    (q_latest_date, df_latest) = active_quarters[0]
+    (q_prev_date, df_prev) = active_quarters[1]
+    (q_prev2_date, df_prev2) = active_quarters[2]
     
-    # 4. 数据合并与复筛 (郑希策略：低 ROE 改善 + 业绩增速验证)
-    print("开始进行第二阶段筛选（财务指标拐点）...")
+    # 4. 数据合并与二阶拐点筛选
+    print("开始进行第二阶段筛选（财务二阶导数拐点）...")
     
-    # 统一转换代码格式为 6 位字符串
     df_liq["code_str"] = df_liq["code"].astype(str).str.zfill(6)
     df_latest["code_str"] = df_latest["股票代码"].astype(str).str.zfill(6)
     df_prev["code_str"] = df_prev["股票代码"].astype(str).str.zfill(6)
+    df_prev2["code_str"] = df_prev2["股票代码"].astype(str).str.zfill(6)
     
-    # 整理财务报表字段
+    # 最新季度财务
     df_latest_clean = df_latest[[
         "code_str", "净资产收益率", "销售毛利率", 
         "营业总收入-同比增长", "净利润-同比增长", "所处行业"
@@ -182,39 +177,52 @@ def main():
         "revenue_growth", "net_profit_growth", "industry"
     ]
     
-    df_prev_clean = df_prev[["code_str", "销售毛利率"]].copy()
-    df_prev_clean.columns = ["code_str", "prev_margin"]
+    # 前一季度财务
+    df_prev_clean = df_prev[["code_str", "净资产收益率", "销售毛利率"]].copy()
+    df_prev_clean.columns = ["code_str", "prev_roe", "prev_margin"]
     
-    # 合并行情与最新财报
+    # 前两季度财务
+    df_prev2_clean = df_prev2[["code_str", "净资产收益率"]].copy()
+    df_prev2_clean.columns = ["code_str", "prev2_roe"]
+    
+    # 链式合并
     df_merged = pd.merge(df_liq, df_latest_clean, on="code_str", how="inner")
-    # 合并前一期财报（对比毛利率）
     df_merged = pd.merge(df_merged, df_prev_clean, on="code_str", how="inner")
+    df_merged = pd.merge(df_merged, df_prev2_clean, on="code_str", how="inner")
     
-    # 转换为数值并清洗
-    for col in ["latest_roe", "latest_margin", "prev_margin", "revenue_growth", "net_profit_growth"]:
+    # 转换数值
+    for col in ["latest_roe", "prev_roe", "prev2_roe", "latest_margin", "prev_margin", "revenue_growth", "net_profit_growth"]:
         df_merged[col] = pd.to_numeric(df_merged[col], errors="coerce")
         
-    # 执行郑希财务改善选股逻辑：
-    # 1. 最新季度 ROE < 8.0% (代表低ROE阶段或改善初期)
-    # 2. 毛利率环比改善：最新季度毛利率 > 上一季度毛利率
-    # 3. 业绩增速验证：营收同比增速 > 15% 或 净利润同比增速 > 20%
-    # 4. 剔除缺失财务数据的标的
+    # 计算一阶改善差与二阶加速度
+    df_merged["roe_change_latest"] = df_merged["latest_roe"] - df_merged["prev_roe"]
+    df_merged["roe_change_prev"] = df_merged["prev_roe"] - df_merged["prev2_roe"]
+    df_merged["roe_acceleration"] = df_merged["roe_change_latest"] - df_merged["roe_change_prev"]
+    df_merged["margin_change"] = df_merged["latest_margin"] - df_merged["prev_margin"]
+    
+    # 执行优化后的选股策略逻辑：
+    # 1. 估值适中：低 ROE 改善阶段 (最新季度 ROE < 12.0%)
+    # 2. 一阶改善：ROE TTM 在最新季度确有改善 (roe_change_latest > 0)
+    # 3. 二阶加速：ROE 改善斜率呈加速度状态 (roe_acceleration > 0)
+    # 4. 毛利率环比提升：最新季度销售毛利率 > 前一季度
+    # 5. 高成长验证：营收同比增速 > 15% 或 净利润同比增速 > 20%
+    # 6. 数据完整性过滤
     df_final = df_merged[
-        (df_merged["latest_roe"] < 8.0) & 
+        (df_merged["latest_roe"] < 12.0) & 
+        (df_merged["roe_change_latest"] > 0) &
+        (df_merged["roe_acceleration"] > 0) &
         (df_merged["latest_margin"] > df_merged["prev_margin"]) & 
         ((df_merged["revenue_growth"] > 15.0) | (df_merged["net_profit_growth"] > 20.0)) &
-        (df_merged["latest_roe"].notna()) &
-        (df_merged["latest_margin"].notna()) &
-        (df_merged["prev_margin"].notna())
+        df_merged["latest_roe"].notna() &
+        df_merged["latest_margin"].notna() &
+        df_merged["prev_margin"].notna() &
+        df_merged["prev2_roe"].notna()
     ].copy()
-    
-    # 计算毛利率提升值
-    df_final["margin_change"] = df_final["latest_margin"] - df_final["prev_margin"]
     
     # 按净利润同比增速降序排列
     df_final.sort_values(by="net_profit_growth", ascending=False, inplace=True)
     
-    print(f"财务筛选完毕，最终选定标的数: {df_final.shape[0]}")
+    print(f"二阶财务筛选完毕，最终选定标的数: {df_final.shape[0]}")
     
     # 5. 格式化输出为 JSON
     stock_list = []
@@ -224,10 +232,13 @@ def main():
             "name": row["name"],
             "price": round(row["price"], 2) if not math.isnan(row["price"]) else None,
             "change_pct": round(row["change_pct"], 2) if not math.isnan(row["change_pct"]) else None,
-            "market_cap": round(row["market_cap"] / 10**8, 2) if not math.isnan(row["market_cap"]) else None, # 换算为亿
-            "turnover": round(row["turnover"] / 10**6, 2) if not math.isnan(row["turnover"]) else None,       # 换算为百万
+            "market_cap": round(row["market_cap"] / 10**8, 2) if not math.isnan(row["market_cap"]) else None,
+            "turnover": round(row["turnover"] / 10**6, 2) if not math.isnan(row["turnover"]) else None,
             "turnover_rate": round(row["turnover_rate"], 2) if not math.isnan(row["turnover_rate"]) else None,
             "latest_roe": round(row["latest_roe"], 2),
+            "prev_roe": round(row["prev_roe"], 2),
+            "roe_change": round(row["roe_change_latest"], 2),
+            "roe_acceleration": round(row["roe_acceleration"], 2),
             "latest_margin": round(row["latest_margin"], 2),
             "prev_margin": round(row["prev_margin"], 2),
             "margin_change": round(row["margin_change"], 2),
@@ -238,8 +249,8 @@ def main():
         
     output_data = {
         "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "latest_quarter": format_quarter_name(latest_date),
-        "previous_quarter": format_quarter_name(prev_date),
+        "latest_quarter": format_quarter_name(q_latest_date),
+        "previous_quarter": format_quarter_name(q_prev_date),
         "stocks": stock_list
     }
     

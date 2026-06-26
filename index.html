@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>郑希“景气周期拼接”量化选股看板</title>
+    <title>郑希“景气周期二阶导数”量化选股看板</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,7 +46,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1450px;
             margin: 0 auto;
         }
 
@@ -380,6 +380,28 @@
             font-weight: 600;
         }
 
+        .roe-acc-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .acc-positive {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }
+
+        .acc-negative {
+            background: rgba(239, 68, 68, 0.12);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+        }
+
         /* Empty State */
         .empty-state {
             padding: 4rem 2rem;
@@ -416,8 +438,8 @@
     <!-- Header -->
     <header>
         <div class="header-left">
-            <h1>郑希策略选股看板</h1>
-            <p><i data-lucide="info"></i> 自动筛选符合“低ROE向好+充足流动性+高成长弹性”的标的</p>
+            <h1>郑希策略二阶导数选股看板</h1>
+            <p><i data-lucide="info"></i> 自动过滤“低ROE二阶加速+毛利率环比提升+高成长验证+充足流动性”的科技标的</p>
         </div>
         <div class="update-badge" id="update-badge">
             <span class="pulse"></span>
@@ -430,16 +452,16 @@
         <!-- Strategy pillars -->
         <div class="strategy-intro">
             <div class="pillar-card">
-                <h3>1. 低 ROE 改善</h3>
-                <p>买在公司 ROE 从低向高爬升的起点（当前季度 ROE &lt; 8.0%），且最新季度销售毛利率出现环比提升，证明产业议价能力拐点已现。</p>
+                <h3>1. ROE 二阶加速度 &gt; 0</h3>
+                <p>当前 ROE 估值适中 (&lt; 12.0%)。核心引入二阶导数：ROE 一阶变动为正且其改善斜率呈现<strong>加速度</strong>状态，精准捕捉产业大周期上升拐点。</p>
             </div>
             <div class="pillar-card">
-                <h3>2. 充足流动性</h3>
-                <p>每日成交额 &gt; 8000 万且换手率 &gt; 1.5%。流动性好有利于选错时迅速撤离，防止落入中小盘流动性危机陷阱。</p>
+                <h3>2. 销售毛利率环比上升</h3>
+                <p>最新季度毛利率 &gt; 上季度毛利率，用微观产品盈利能力（定价权）改善，来佐证行业景气度的回升。</p>
             </div>
             <div class="pillar-card">
-                <h3>3. 业绩增速验证</h3>
-                <p>营业收入同比增速 &gt; 15% 或净利润同比增速 &gt; 20%，通过真实的销售及业绩成长来佐证产业周期的景气上行。</p>
+                <h3>3. 成长验证 &amp; 充足流动性</h3>
+                <p>单季营收同比 &gt; 15% 或净利同比 &gt; 20% 验证景气度；日均成交额 &gt; 8000 万且换手率 &gt; 1.5%，保障极速撤退能力。</p>
             </div>
         </div>
 
@@ -478,9 +500,10 @@
                         <th onclick="sortTable('price')">最新价/涨跌幅 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('market_cap')">总市值 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('turnover')">成交量能 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('latest_roe')">当前季度 ROE <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('latest_roe')">当前 ROE / 一阶改善 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('roe_acceleration')">二阶加速度 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('latest_margin')">毛利率 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
-                        <th onclick="sortTable('margin_change')">环比提升 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
+                        <th onclick="sortTable('margin_change')">毛利率环比 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('net_profit_growth')">归母净利增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                         <th onclick="sortTable('revenue_growth')">营业收入增速 <i class="sort-icon" data-lucide="arrow-up-down"></i></th>
                     </tr>
@@ -585,6 +608,10 @@
             const trendClass = changeVal > 0 ? 'trend-up' : (changeVal < 0 ? 'trend-down' : '');
             const sign = changeVal > 0 ? '+' : '';
             
+            // ROE Acc trend Class
+            const accClass = stock.roe_acceleration > 0 ? 'acc-positive' : 'acc-negative';
+            const accIcon = stock.roe_acceleration > 0 ? '▲' : '▼';
+            
             tr.innerHTML = `
                 <td>
                     <div class="stock-name-cell">
@@ -602,7 +629,15 @@
                     <div>${stock.turnover !== null ? stock.turnover.toFixed(1) : '-'} 百万</div>
                     <div class="stock-code">换手 ${stock.turnover_rate !== null ? stock.turnover_rate.toFixed(2) : '-'}%</div>
                 </td>
-                <td><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></td>
+                <td>
+                    <div style="margin-bottom: 0.15rem;"><span class="roe-badge">${stock.latest_roe.toFixed(2)}%</span></div>
+                    <div class="stock-code trend-up" style="font-size: 0.75rem; font-weight: 600;">季改 +${stock.roe_change.toFixed(2)}%</div>
+                </td>
+                <td>
+                    <span class="roe-acc-badge ${accClass}">
+                        ${accIcon} +${stock.roe_acceleration.toFixed(2)}%
+                    </span>
+                </td>
                 <td>
                     <div>${stock.latest_margin.toFixed(2)}%</div>
                     <div class="stock-code">前值 ${stock.prev_margin.toFixed(2)}%</div>
