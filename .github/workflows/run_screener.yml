@@ -11,6 +11,9 @@ on:
     - cron: '30 7 * * 1-5' # UTC 7:30 is Beijing Time 15:30 (Monday - Friday)
   workflow_dispatch:      # Support manual triggering
 
+permissions:
+  contents: write
+
 jobs:
   run-screener:
     runs-on: ubuntu-latest
