@@ -1,6 +1,12 @@
 name: Daily Stock Screener
 
 on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'results.json'
+      - 'README.md'
   schedule:
     - cron: '30 7 * * 1-5' # UTC 7:30 is Beijing Time 15:30 (Monday - Friday)
   workflow_dispatch:      # Support manual triggering
